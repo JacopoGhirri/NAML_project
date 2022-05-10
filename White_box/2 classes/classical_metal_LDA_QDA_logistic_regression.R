@@ -37,19 +37,19 @@ mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 }
 #####
 
-#data generation - JAZZ & CLASSICAL
+#data generation - CLASSICAL & METAL
 
-jazz_data<- read_csv("jazz.csv")
-jazz_data$genre<-"jazz"
-jazz_data$binary_genre<-0
+classical_data<- read_csv("classical.csv")
+classical_data$binary_genre<-0
 
-classical_data<-read_csv("classical.csv")
-classical_data$genre<-"classical"
-classical_data$binary_genre<-1
+metal_data<-read_csv("metal.csv")
+metal_data$binary_genre<-1
 
-data<-rbind(jazz_data,classical_data)
+data<-rbind(classical_data,metal_data)
   
-genre<-factor(data$genre)
+
+
+genre<-factor(data$binary_genre)
 levels(genre)
 
 #priors 
@@ -58,20 +58,20 @@ p<-c(1/2,1/2)
 #assumptions for qda, lda
 
 #gauss
-mcshapiro.test(data[which(genre=="classical"),1:7])
-mcshapiro.test(data[which(genre=="jazz"),1:7])
+mcshapiro.test(data[which(data$binary_genre=="1"),1:7]) 
+mcshapiro.test(data[which(data$binary_genre=="0"),1:7])
 
 
 #covariance 
-v1<-var(data[which(genre=="classical"),1:7])
-v2<-var(data[which(genre=="jazz"),1:7])
+v1<-var(data[which(data$binary_genre==1),1:7])
+v2<-var(data[which(data$binary_genre==0),1:7])
 v1
 v2
 
 
 
 #QDA (dati gaussiani, no same covariance)
-q<-qda(data$genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
+q<-qda(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
 q #means
 
 #aper
@@ -88,7 +88,7 @@ for(i in 1:l){
 APER_qda
 
 #LDA (dati NON gaussiani, same covariance)
-l<-lda(data$genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
+l<-lda(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
 l #means
 
 #aper
@@ -109,16 +109,11 @@ APER_lda
 glm_model<-glm(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast ,family=binomial( link = logit ))
 summary(glm_model)
 
-glm_model_1<-glm(data$binary_genre~ data$zcr+data$rms_energy+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast ,family=binomial( link = logit ))
-summary(glm_model_1)
 
-glm_model_2<-glm(data$binary_genre~ data$zcr+data$rms_energy+data$spec_flat+data$mf_contrast+data$lf_contrast ,family=binomial( link = logit ))
-summary(glm_model_2)
 
-glm_model_3<-glm(data$binary_genre~ data$zcr+data$rms_energy+data$spec_flat+data$lf_contrast ,family=binomial( link = logit ))
-summary(glm_model_3)
 
-anova( glm_model_3, glm_model, test = "Chisq" )
+
+#anova( glm_model_3, glm_model, test = "Chisq" )
 #if low pvalue recuced model is less significant
 
 #table
@@ -140,3 +135,4 @@ sensitivity
 #% casi 0 classificati come 0 (jazz)
 specificity= tab[ 1, 1 ] /( tab [ 1, 2 ] + tab [ 1, 1 ] )
 specificity
+

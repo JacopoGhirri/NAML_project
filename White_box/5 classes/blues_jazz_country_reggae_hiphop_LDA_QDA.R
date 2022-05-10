@@ -31,42 +31,49 @@ mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 #####
 
 #data generation
+blues_data<- read_csv("blues.csv")
+blues_data$genre<-"blues"
 
 jazz_data<- read_csv("jazz.csv")
 jazz_data$genre<-"jazz"
 
-classical_data<-read_csv("classical.csv")
-classical_data$genre<-"classical"
+country_data<- read_csv("country.csv")
+country_data$genre<-"country"
 
-rock_data<-read_csv("rock.csv")
-rock_data$genre<-"rock"
+reggae_data<-read_csv("reggae.csv")
+reggae_data$genre<-"reggae"
 
-data<-rbind(jazz_data,classical_data,rock_data)
+hiphop_data<-read_csv("hiphop.csv")
+hiphop_data$genre<-"hiphop"
+
+data<-rbind(blues_data,jazz_data,country_data,reggae_data,hiphop_data)
   
 genre<-factor(data$genre)
 levels(genre)
 
-plot(data[which(genre=="classical"),1:2], col="red")
-points(data[which(genre=="jazz"),1:2], col="green")
-points(data[which(genre=="rock"),1:2], col="blue")
-
 #priors 
-p<-rep(1/3,3)
+p<-rep(1/5,5)
 
 #assumptions
 
 #gauss
-mcshapiro.test(data[which(genre=="classical"),1:7])
+mcshapiro.test(data[which(genre=="blues"),1:7])
 mcshapiro.test(data[which(genre=="jazz"),1:7])
-mcshapiro.test(data[which(genre=="rock"),1:7])
+mcshapiro.test(data[which(genre=="country"),1:7])
+mcshapiro.test(data[which(genre=="reggae"),1:7])
+mcshapiro.test(data[which(genre=="hiphop"),1:7])
 
 #covariance 
-v1<-var(data[which(genre=="classical"),1:7])
+v1<-var(data[which(genre=="blues"),1:7])
 v2<-var(data[which(genre=="jazz"),1:7])
-v3<-var(data[which(genre=="rock"),1:7])
+v3<-var(data[which(genre=="country"),1:7])
+v4<-var(data[which(genre=="reggae"),1:7])
+v5<-var(data[which(genre=="hiphop"),1:7])
 v1
 v2
 v3
+v4
+v5
 
 
 #QDA (dati gaussiani, no same covariance)
@@ -85,6 +92,7 @@ for(i in 1:l){
   APER_qda <- APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
 APER_qda
+#0.39
 
 
 #LDA (dati NON gaussiani, same covariance)
@@ -103,3 +111,4 @@ for(i in 1:len){
   APER_lda <- APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
 APER_lda
+# 0.45
