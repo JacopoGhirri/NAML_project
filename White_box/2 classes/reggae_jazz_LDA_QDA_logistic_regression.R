@@ -86,6 +86,7 @@ for(i in 1:l){
   APER_qda <- APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
 APER_qda
+#0.145
 
 #LDA (dati NON gaussiani, same covariance)
 l<-lda(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
@@ -103,23 +104,33 @@ for(i in 1:len){
   APER_lda <- APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
 APER_lda
+#0.125
 
 #logistic regression + covariate selection
 
 glm_model<-glm(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast ,family=binomial( link = logit ))
 summary(glm_model)
 
+glm_model_1<-glm(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast ,family=binomial( link = logit ))
+summary(glm_model_1)
+
+glm_model_2<-glm(data$binary_genre~ data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast ,family=binomial( link = logit ))
+summary(glm_model_2)
+
+glm_model_3<-glm(data$binary_genre~ data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast ,family=binomial( link = logit ))
+summary(glm_model_3)
+
+glm_model_4<-glm(data$binary_genre~ data$mean_chroma+data$hf_contrast+data$mf_contrast ,family=binomial( link = logit ))
+summary(glm_model_4)
 
 
-
-
-#anova( glm_model_3, glm_model, test = "Chisq" )
+anova( glm_model_4, glm_model, test = "Chisq" )
 #if low pvalue recuced model is less significant
 
 #table
 threshold = 0.5
 real  = data$binary_genre
-predicted = as.numeric( glm_model_3$fitted.values > threshold )
+predicted = as.numeric( glm_model_4$fitted.values > threshold )
 # 1 se > soglia, 0 se < = soglia
 
 tab = table( real, predicted )
@@ -128,11 +139,16 @@ tab
 #% casi classificati correttamente 
 accuracy=round( sum( diag( tab ) ) / sum( tab ), 2 )
 accuracy
+#0.88
 1-accuracy
+
 #% casi 1 classificati come 1 (classical)
 sensitivity=tab [ 2, 2 ] /( tab [ 2, 1 ] + tab [ 2, 2 ] ) 
 sensitivity
+#0.87
+
 #% casi 0 classificati come 0 (jazz)
 specificity= tab[ 1, 1 ] /( tab [ 1, 2 ] + tab [ 1, 1 ] )
 specificity
+#0.88
 
