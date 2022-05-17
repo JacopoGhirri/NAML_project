@@ -1,4 +1,4 @@
-setwd("D:/Marta/Politecnico/Numerical analysis for machine learning/Project/NAML_project/White_box/Dati")
+setwd("C:/Users/user/Desktop/università/dare/Numerical Analysis for Machine Learning/NAML proj/NAML_repo/NAML_project/White_box/Dati")
 #####
 library(MASS)
 library(class)
@@ -9,6 +9,7 @@ library(car)
 library(MASS)
 library(class)
 library(readr)
+library(pscl)
 
 
 library(rms)
@@ -45,12 +46,9 @@ classical_data$binary_genre<-0
 hiphop_data<-read_csv("hiphop.csv")
 hiphop_data$binary_genre<-1
 
-data<-rbind(classical_data,hiphop_data)
-  
+train_data<-rbind(classical_data[0:80,],hiphop_data[0:80,])
+test_data<-rbind(classical_data[81:100,],hiphop_data[81:100,])
 
-
-genre<-factor(data$binary_genre)
-levels(genre)
 
 #priors 
 p<-c(1/2,1/2)
@@ -58,81 +56,132 @@ p<-c(1/2,1/2)
 #assumptions for qda, lda
 
 #gauss
-mcshapiro.test(data[which(data$binary_genre=="1"),1:7]) 
-mcshapiro.test(data[which(data$binary_genre=="0"),1:7])
+mcshapiro.test(train_data[which(train_data$binary_genre=="1"),1:7]) 
+mcshapiro.test(train_data[which(train_data$binary_genre=="0"),1:7])
 
+#definetly not gaussian
 
 #covariance 
-v1<-var(data[which(data$binary_genre==1),1:7])
-v2<-var(data[which(data$binary_genre==0),1:7])
+v1<-var(train_data[which(train_data$binary_genre==1),1:7])
+v2<-var(train_data[which(train_data$binary_genre==0),1:7])
 v1
 v2
 
+#definetly not the same coovariance structure
 
-
+#####
 #QDA (dati gaussiani, no same covariance)
-q<-qda(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
+q<-qda(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast,prior=p, data = train_data)
 q #means
 
-#aper
-Qda.m <- predict(q)
-f= factor(genre)
+#aper_train data
+Qda.m <- predict(object = q, method = "plug-in")
+f= factor(train_data$binary_genre)
 table(true.lable=f, class.assigned=Qda.m$class)
 
 l <-length(levels(as.factor(f))) 
 t <- table(true.label = f , assigned.label =Qda.m$class )
-APER_qda <- 0
+train_APER_qda <- 0
 for(i in 1:l){
-  APER_qda <- APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
+  train_APER_qda <- train_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
-APER_qda
+train_APER_qda
+
+#aper_test data
+Qda.m <- predict(object = q, newdata = data.frame(test_data[,1:7]), method = "plug-in")
+f= factor(test_data$binary_genre)
+table(true.lable=f, class.assigned=Qda.m$class)
+
+l <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =Qda.m$class )
+test_APER_qda <- 0
+for(i in 1:l){
+  test_APER_qda <- test_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
+}
+test_APER_qda
+
+qda_accuracies = cbind(training = 1-train_APER_qda,test = 1-test_APER_qda)
+qda_accuracies
+# training  test
+# 0.98125   0.975
 
 #LDA (dati NON gaussiani, same covariance)
-l<-lda(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
+l<-lda(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast,prior=p, data = train_data)
 l #means
 
-#aper
-Lda.m <- predict(l)
-f= factor(genre)
+#aper_train data
+Lda.m <- predict(l, method = "plug-in")
+f= factor(train_data$binary_genre)
 table(true.lable=f, class.assigned=Lda.m$class)
 
 len <-length(levels(as.factor(f))) 
 t <- table(true.label = f , assigned.label =Lda.m$class )
-APER_lda <- 0
+train_APER_lda <- 0
 for(i in 1:len){
-  APER_lda <- APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
+  train_APER_lda <- train_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
-APER_lda
+train_APER_lda
+
+#aper_test data
+Lda.m <- predict(object = l,newdata = test_data, method = "plug-in")
+f= factor(test_data$binary_genre)
+table(true.lable=f, class.assigned=Lda.m$class)
+
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =Lda.m$class )
+test_APER_lda <- 0
+for(i in 1:len){
+  test_APER_lda <- test_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
+}
+test_APER_lda
+
+lda_accuracies = cbind(training = 1-train_APER_lda,test = 1-test_APER_lda)
+lda_accuracies
+
+#####
+
+#LDA and QDA lead to good performances, despite the thoeretical assumptions not being verified
 
 #logistic regression + covariate selection
 
-glm_model<-glm(data$binary_genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast ,family=binomial( link = logit ))
+glm_model<-glm(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast ,family=binomial( link = logit ), data = train_data)
 summary(glm_model)
+pscl::pR2(glm_model)["McFadden"]
+# R^2 = 1
 
+# we apply backward selection: in order we remove rms_energy, zrc, spec_flat, mf_contrast, hf_contrast, lf_contrast
 
+glm_model_red <-glm(binary_genre~ mean_chroma ,family=binomial( link = logit ), data = train_data)
+summary(glm_model_red)
+pscl::pR2(glm_model_red)["McFadden"]
+# R^2 = 0.909, still really good
 
+#accuracy on training data:
+pred_train <- as.numeric(fitted(object = glm_model_red)>0.5)
+f= factor(train_data$binary_genre)
+table(true.lable=f, class.assigned=pred_train)
 
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =pred_train )
+train_acc_logit <- 0
+for(i in 1:len){
+  train_acc_logit <- train_acc_logit + sum(t[i,i]*p[i])/sum(t[i,])
+}
+train_acc_logit
+#accuracy on test data:
+pred_test <- as.numeric(predict(object = glm_model_red, newdata= test_data, type="response")>0.5)
+f= factor(test_data$binary_genre)
+table(true.lable=f, class.assigned=pred_test)
 
-#anova( glm_model_3, glm_model, test = "Chisq" )
-#if low pvalue recuced model is less significant
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =pred_test )
+test_acc_logit <- 0
+for(i in 1:len){
+  test_acc_logit <- test_acc_logit + sum(t[i,i]*p[i])/sum(t[i,])
+}
+test_acc_logit
 
-#table
-threshold = 0.5
-real  = data$binary_genre
-predicted = as.numeric( glm_model_3$fitted.values > threshold )
-# 1 se > soglia, 0 se < = soglia
-
-tab = table( real, predicted )
-tab
-
-#% casi classificati correttamente 
-accuracy=round( sum( diag( tab ) ) / sum( tab ), 2 )
-accuracy
-1-accuracy
-#% casi 1 classificati come 1 (classical)
-sensitivity=tab [ 2, 2 ] /( tab [ 2, 1 ] + tab [ 2, 2 ] ) 
-sensitivity
-#% casi 0 classificati come 0 (jazz)
-specificity= tab[ 1, 1 ] /( tab [ 1, 2 ] + tab [ 1, 1 ] )
-specificity
-
+logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_acc_logit)
+logistic_regression_accuracies
+# training  test
+# 0.975     0.95
