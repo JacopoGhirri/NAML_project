@@ -50,7 +50,6 @@ blues_data$binary_genre<-1
 train_data<-rbind(country_data[0:80,],blues_data[0:80,])
 test_data<-rbind(country_data[81:100,],blues_data[81:100,])
 
-
 #priors 
 p<-c(1/2,1/2)
 
