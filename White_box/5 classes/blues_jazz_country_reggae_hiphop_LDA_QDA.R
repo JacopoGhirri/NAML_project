@@ -1,13 +1,27 @@
-setwd("D:/Marta/Politecnico/Numerical analysis for machine learning/Project/NAML_project/White_box/Dati")
+setwd("C:/Users/user/Desktop/università/dare/Numerical Analysis for Machine Learning/NAML proj/NAML_repo/NAML_project/White_box/Dati")
 #####
 library(MASS)
 library(class)
+
 library(mvtnorm)
 library(mvnormtest)
 library(car)
 library(MASS)
 library(class)
 library(readr)
+library(pscl)
+
+
+library(rms)
+library(arm)
+library(ResourceSelection)
+library(pROC)
+
+library(tidyverse)
+library(caret)
+library(nnet)
+library(ramify)
+
 
 mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 {
@@ -46,69 +60,178 @@ reggae_data$genre<-"reggae"
 hiphop_data<-read_csv("hiphop.csv")
 hiphop_data$genre<-"hiphop"
 
-data<-rbind(blues_data,jazz_data,country_data,reggae_data,hiphop_data)
-  
-genre<-factor(data$genre)
-levels(genre)
+train_data<-rbind(blues_data[0:80,],jazz_data[0:80,],country_data[0:80,],reggae_data[0:80,],hiphop_data[0:80,])
+test_data<-rbind(blues_data[81:100,],jazz_data[81:100,],country_data[81:100,],reggae_data[81:100,],hiphop_data[81:100,])
+
 
 #priors 
 p<-rep(1/5,5)
 
-#assumptions
 
 #gauss
-mcshapiro.test(data[which(genre=="blues"),1:7])
-mcshapiro.test(data[which(genre=="jazz"),1:7])
-mcshapiro.test(data[which(genre=="country"),1:7])
-mcshapiro.test(data[which(genre=="reggae"),1:7])
-mcshapiro.test(data[which(genre=="hiphop"),1:7])
+mcshapiro.test(train_data[which(train_data$genre=="blues"),1:7])
+mcshapiro.test(train_data[which(train_data$genre=="jazz"),1:7])
+mcshapiro.test(train_data[which(train_data$genre=="country"),1:7])
+mcshapiro.test(train_data[which(train_data$genre=="reggae"),1:7])
+mcshapiro.test(train_data[which(train_data$genre=="hiphop"),1:7])
+
+#definetly not gaussian
 
 #covariance 
-v1<-var(data[which(genre=="blues"),1:7])
-v2<-var(data[which(genre=="jazz"),1:7])
-v3<-var(data[which(genre=="country"),1:7])
-v4<-var(data[which(genre=="reggae"),1:7])
-v5<-var(data[which(genre=="hiphop"),1:7])
+v1<-var(train_data[which(train_data$genre=="blues"),1:7])
+v2<-var(train_data[which(train_data$genre=="jazz"),1:7])
+v3<-var(train_data[which(train_data$genre=="country"),1:7])
+v4<-var(train_data[which(train_data$genre=="reggae"),1:7])
+v5<-var(train_data[which(train_data$genre=="hiphop"),1:7])
 v1
 v2
 v3
 v4
 v5
 
+# not homoscedastic
+
 
 #QDA (dati gaussiani, no same covariance)
-q<-qda(data$genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast ,prior=p)
+q<-qda(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, prior=p, data = train_data)
 q #means
 
-#aper
-Qda.m <- predict(q)
-f= factor(genre)
+#aper_train data
+Qda.m <- predict(object=q, method = "plug-in")
+f= factor(train_data$genre)
 table(true.lable=f, class.assigned=Qda.m$class)
 
 l <-length(levels(as.factor(f))) 
 t <- table(true.label = f , assigned.label =Qda.m$class )
-APER_qda <- 0
+train_APER_qda <- 0
 for(i in 1:l){
-  APER_qda <- APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
+  train_APER_qda <- train_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
-APER_qda
-#0.39
+train_APER_qda
+
+#aper_test data
+Qda.m <- predict(object = q, newdata = data.frame(test_data[,1:7]), method = "plug-in")
+f= factor(test_data$genre)
+table(true.lable=f, class.assigned=Qda.m$class)
+
+l <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =Qda.m$class )
+test_APER_qda <- 0
+for(i in 1:l){
+  test_APER_qda <- test_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
+}
+test_APER_qda
+
+qda_accuracies = cbind(training = 1-train_APER_qda,test = 1-test_APER_qda)
+qda_accuracies
+# training  test
+# 0.6575    0.48
 
 
 #LDA (dati NON gaussiani, same covariance)
-l<-lda(data$genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
+l<-lda(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast,prior=p, data = train_data)
 l #means
 
-#aper
-Lda.m <- predict(l)
-f= factor(genre)
+#aper_train data
+Lda.m <- predict(l, method = "plug-in")
+f= factor(train_data$genre)
 table(true.lable=f, class.assigned=Lda.m$class)
 
 len <-length(levels(as.factor(f))) 
 t <- table(true.label = f , assigned.label =Lda.m$class )
-APER_lda <- 0
+train_APER_lda <- 0
 for(i in 1:len){
-  APER_lda <- APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
+  train_APER_lda <- train_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
 }
-APER_lda
-# 0.45
+train_APER_lda
+
+#aper_test data
+Lda.m <- predict(object = l,newdata = test_data, method = "plug-in")
+f= factor(test_data$genre)
+table(true.lable=f, class.assigned=Lda.m$class)
+
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =Lda.m$class )
+test_APER_lda <- 0
+for(i in 1:len){
+  test_APER_lda <- test_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
+}
+test_APER_lda
+
+lda_accuracies = cbind(training = 1-train_APER_lda,test = 1-test_APER_lda)
+lda_accuracies
+# training  test
+# 0.5925 0.26
+
+# multinomial logistic regression
+
+model <- nnet::multinom(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, data = train_data)
+summary(model)
+pscl::pR2(model)["McFadden"]
+# R^2 = 0.432471 
+
+#we reduce the model based on approximate confidence intervals, applying backward selection we remove hf_contrast
+model_red <- nnet::multinom(genre~ zcr+rms_energy+mean_chroma+spec_flat+mf_contrast+lf_contrast, data = train_data)
+summary(model_red)
+pscl::pR2(model_red)["McFadden"]
+# R^2 = 0.4139059  
+#unsure, but zcr could be reduced
+model_red2 <- nnet::multinom(genre~ rms_energy+mean_chroma+spec_flat+mf_contrast+lf_contrast, data = train_data)
+summary(model_red2)
+pscl::pR2(model_red2)["McFadden"]
+# R^2 = 0.4028664  
+
+
+# first reduced model
+#####
+#accuracy on training data:
+pred_train <- factor(predict(object = model_red,type="class"))
+f= factor(train_data$genre)
+table(true.lable=f, class.assigned=pred_train)
+
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =pred_train )
+train_acc_logit <- mean(f == pred_train)
+train_acc_logit
+#accuracy on test data:
+pred_test <- factor(predict(object = model_red, newdata= test_data, type="class"))
+f= factor(test_data$genre)
+table(true.lable=f, class.assigned=pred_test)
+
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =pred_test )
+test_acc_logit <- mean(f == pred_test)
+test_acc_logit
+
+logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_acc_logit)
+logistic_regression_accuracies
+# training  test
+# 0.6125    0.42
+#####
+
+# second reduced model
+#####
+#accuracy on training data:
+pred_train <- factor(predict(object = model_red,type="class"))
+f= factor(train_data$genre)
+table(true.lable=f, class.assigned=pred_train)
+
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =pred_train )
+train_acc_logit <- mean(f == pred_train)
+train_acc_logit
+#accuracy on test data:
+pred_test <- factor(predict(object = model_red2, newdata= test_data, type="class"))
+f= factor(test_data$genre)
+table(true.lable=f, class.assigned=pred_test)
+
+len <-length(levels(as.factor(f))) 
+t <- table(true.label = f , assigned.label =pred_test )
+test_acc_logit <- mean(f == pred_test)
+test_acc_logit
+
+logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_acc_logit)
+logistic_regression_accuracies
+# training  test
+# 0.6125    0.39
+#####
