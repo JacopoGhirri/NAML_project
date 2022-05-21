@@ -17,57 +17,68 @@ library(arm)
 library(ResourceSelection)
 library(pROC)
 
-mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
-{
-  library(mvnormtest)
-  n   <- dim(X)[1]
-  p   <- dim(X)[2]
-  mu  <- rep(0,p)
-  sig <- diag(p)
-  W   <- NULL
-  for(i in 1:sim)
-  {
-    Xsim <- rmvnorm(n, mu, sig)
-    W   <- c(W, mshapiro.test(t(Xsim))$stat)
-    # mshapiro.test(X): compute the statistics min(W) for the sample X
-  }
-  Wmin   <- mshapiro.test(t(X))$stat   # min(W) for the given sample
-  pvalue <- sum(W < Wmin)/sim          # proportion of min(W) more extreme than the observed Wmin
-  devst  <- sqrt(pvalue*(1-pvalue)/sim)
-  list(Wmin = as.vector(Wmin), pvalue = pvalue, devst = devst, sim = sim)
-}
 #####
 
-#data generation - REGGAE & JAZZ
+#data generation - CLASSICAL & METAL
 
-reggae_data<- read_csv("reggae.csv")
-reggae_data$binary_genre<-0
+classical_data<- read_csv("classical.csv")
+classical_data$binary_genre<-0
 
-jazz_data<-read_csv("jazz.csv")
-jazz_data$binary_genre<-1
+metal_data<-read_csv("metal.csv")
+metal_data$binary_genre<-1
 
-train_data<-rbind(reggae_data[0:80,],jazz_data[0:80,])
-test_data<-rbind(reggae_data[81:100,],jazz_data[81:100,])
+
+#adding dirty data
+blues <- read_csv("blues.csv")
+blues <- blues[1:10,]
+blues$binary_genre<-0
+blues$binary_genre[6:10]<-1
+
+country <- read_csv("country.csv")
+country <- country[1:10,]
+country$binary_genre<-0
+country$binary_genre[6:10]<-1
+
+disco <- read_csv("disco.csv")
+disco <- disco[1:10,]
+disco$binary_genre<-0
+disco$binary_genre[6:10]<-1
+
+jazz <- read_csv("jazz.csv")
+jazz <- jazz[1:10,]
+jazz$binary_genre<-0
+jazz$binary_genre[6:10]<-1
+
+hiphop <- read_csv("hiphop.csv")
+hiphop <- hiphop[1:10,]
+hiphop$binary_genre<-0
+hiphop$binary_genre[6:10]<-1
+
+pop <- read_csv("pop.csv")
+pop <- pop[1:10,]
+pop$binary_genre<-0
+pop$binary_genre[6:10]<-1
+
+reggae <- read_csv("reggae.csv")
+reggae <- reggae[1:10,]
+reggae$binary_genre<-0
+reggae$binary_genre[6:10]<-1
+
+rock <- read_csv("rock.csv")
+rock <- rock[1:10,]
+rock$binary_genre<-0
+rock$binary_genre[6:10]<-1
+
+train_data<-rbind(classical_data[0:80,],metal_data[0:80,])
+test_data<-rbind(classical_data[81:100,],metal_data[81:100,])
+
+train_data<-rbind(train_data,blues,country,disco,jazz,hiphop,pop,reggae,rock)
 
 #priors 
 p<-c(1/2,1/2)
 
-#assumptions for qda, lda
+#assumptions for qda, lda are pointless since one third of the dataset is composed of outliers
 
-#gauss
-mcshapiro.test(train_data[which(train_data$binary_genre=="1"),1:7]) 
-mcshapiro.test(train_data[which(train_data$binary_genre=="0"),1:7])
-
-# definetly not gaussian
-
-
-#covariance 
-v1<-var(train_data[which(train_data$binary_genre==1),1:7])
-v2<-var(train_data[which(train_data$binary_genre==0),1:7])
-v1
-v2
-
-# homoscedasticity could hold
 
 #QDA (dati gaussiani, no same covariance)
 q<-qda(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, prior=p, data = train_data)
@@ -102,7 +113,7 @@ test_APER_qda
 qda_accuracies = cbind(training = 1-train_APER_qda,test = 1-test_APER_qda)
 qda_accuracies
 # training  test
-# 0.9125    0.675
+# 0.825     1
 
 
 #LDA (dati NON gaussiani, same covariance)
@@ -138,27 +149,49 @@ test_APER_lda
 lda_accuracies = cbind(training = 1-train_APER_lda,test = 1-test_APER_lda)
 lda_accuracies
 # training  test
-# 0.8875    0.775
-
-#could be an overfit, still good performances, but no theoretical background
+# 0.8625    1
 
 #logistic regression + covariate selection
 
 glm_model<-glm(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast ,family=binomial( link = logit ), data = train_data)
 summary(glm_model)
 pscl::pR2(glm_model)["McFadden"]
-# R^2 = 0.6797698
+# R^2 = 0.5349397
 
-# we apply backward selection: in order we remove spec_flat, lf_contrast, rms_energy, zrc
 
-glm_model_red <-glm(binary_genre~ mean_chroma+hf_contrast+mf_contrast ,family=binomial( link = logit ), data = train_data)
+
+residualPlots(glm_model)
+#outlier detection
+out = which(abs(glm_model$residuals)/sd(glm_model$residuals) > 2)
+out
+train_data_clean = train_data[-out,]
+
+#we iterate 3 times
+glm_model<-glm(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast ,family=binomial( link = logit ), data = train_data_clean)
+summary(glm_model)
+residualPlots(glm_model)
+out = which(abs(glm_model$residuals)/sd(glm_model$residuals) > 2)
+out
+train_data_clean = train_data_clean[-out,]
+
+
+summary(glm_model)
+pscl::pR2(glm_model)["McFadden"]
+# R^2 = 0.9283968
+
+which(train_data$mean_chroma %in% train_data_clean$mean_chroma)
+#indeed we eliminated the most damaging outliers
+
+# we apply backward selection: in order we remove spec_flat, rms_energy, hf_contrast
+
+glm_model_red <-glm(binary_genre~ zcr+mean_chroma+mf_contrast+lf_contrast ,family=binomial( link = logit ), data = train_data_clean)
 summary(glm_model_red)
 pscl::pR2(glm_model_red)["McFadden"]
-# R^2 = 0.6681052
+# R^2 = 0.8956908, still really good
 
 #accuracy on training data:
 pred_train <- as.numeric(fitted(object = glm_model_red)>0.5)
-f= factor(train_data$binary_genre)
+f= factor(train_data_clean$binary_genre)
 table(true.lable=f, class.assigned=pred_train)
 
 len <-length(levels(as.factor(f))) 
@@ -184,9 +217,4 @@ test_acc_logit
 logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_acc_logit)
 logistic_regression_accuracies
 # training  test
-# 0.88125   0.75
-
-
-
-#diagnostic
-residualPlots(glm_model_red)
+# 0.9723496 0.95

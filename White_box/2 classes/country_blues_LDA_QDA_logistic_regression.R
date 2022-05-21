@@ -186,3 +186,7 @@ logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_a
 logistic_regression_accuracies
 # training  test
 # 0.78125   0.475
+
+
+#diagnostic
+residualPlots(glm_model_red)
