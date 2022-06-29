@@ -1,13 +1,30 @@
-setwd("D:/Marta/Politecnico/Numerical analysis for machine learning/Project/NAML_project/White_box/Dati")
+setwd("C:/Users/user/Desktop/università/dare/Numerical Analysis for Machine Learning/NAML proj/NAML_repo/NAML_project/White_box/Dati")
 #####
 library(MASS)
 library(class)
+
 library(mvtnorm)
 library(mvnormtest)
 library(car)
 library(MASS)
 library(class)
 library(readr)
+library(pscl)
+
+
+library(rms)
+library(arm)
+library(ResourceSelection)
+library(pROC)
+
+source("C:/Users/user/Desktop/università/dare/Numerical Analysis for Machine Learning/NAML proj/NAML_repo/NAML_project/White_box/metric_extractor.R")
+
+
+library(tidyverse)
+library(caret)
+library(nnet)
+library(ramify)
+
 
 mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 {
@@ -31,6 +48,9 @@ mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 #####
 
 #data generation
+
+n_classes <- 5
+
 rock_data<- read_csv("rock.csv")
 rock_data$genre<-"rock"
 
@@ -46,10 +66,9 @@ disco_data$genre<-"disco"
 hiphop_data<-read_csv("hiphop.csv")
 hiphop_data$genre<-"hiphop"
 
-data<-rbind(rock_data,metal_data,country_data,disco_data,hiphop_data)
-  
-genre<-factor(data$genre)
-levels(genre)
+train_data<-rbind(rock_data[0:80,],metal_data[0:80,],country_data[0:80,],disco_data[0:80,],hiphop_data[0:80,])
+test_data<-rbind(rock_data[81:100,],metal_data[81:100,],country_data[81:100,],disco_data[81:100,],hiphop_data[81:100,])
+
 
 #priors 
 p<-rep(1/5,5)
@@ -76,39 +95,91 @@ v4
 v5
 
 
+
 #QDA (dati gaussiani, no same covariance)
-q<-qda(data$genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast ,prior=p)
+q<-qda(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, prior=p, data = train_data)
 q #means
 
-#aper
-Qda.m <- predict(q)
-f= factor(genre)
+#metrics
+Qda.m <- predict(object=q, method = "plug-in")
+f= factor(train_data$genre)
 table(true.lable=f, class.assigned=Qda.m$class)
 
-l <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Qda.m$class )
-APER_qda <- 0
-for(i in 1:l){
-  APER_qda <- APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-APER_qda
-#0.378
+t_train <- table(true.label = f , assigned.label =Qda.m$class )
+
+Qda.m <- predict(object = q, newdata = data.frame(test_data[,1:7]), method = "plug-in")
+f= factor(test_data$genre)
+table(true.lable=f, class.assigned=Qda.m$class)
+
+t_test <- table(true.label = f , assigned.label =Qda.m$class )
+
+qda_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
+qda_metrics
+
+#            training      test
+# accuracy  0.6475000 0.4300000
+# precision 0.6598780 0.4895873
+# recall    0.6475000 0.4300000
+# F1_score  0.6326121 0.3955583
 
 
 #LDA (dati NON gaussiani, same covariance)
-l<-lda(data$genre~ data$zcr+data$rms_energy+data$mean_chroma+data$spec_flat+data$hf_contrast+data$mf_contrast+data$lf_contrast  ,prior=p)
+l<-lda(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast,prior=p, data = train_data)
 l #means
 
-#aper
-Lda.m <- predict(l)
-f= factor(genre)
+#metrics
+Lda.m <- predict(l, method = "plug-in")
+f= factor(train_data$genre)
 table(true.lable=f, class.assigned=Lda.m$class)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Lda.m$class )
-APER_lda <- 0
-for(i in 1:len){
-  APER_lda <- APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-APER_lda
-# 0.418
+t_train <- table(true.label = f , assigned.label =Lda.m$class )
+
+Lda.m <- predict(object = l,newdata = test_data, method = "plug-in")
+f= factor(test_data$genre)
+table(true.lable=f, class.assigned=Lda.m$class)
+
+t_test <- table(true.label = f , assigned.label =Lda.m$class )
+
+lda_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
+lda_metrics
+
+#            training      test
+# accuracy  0.6250000 0.4100000
+# precision 0.6134596 0.4493066
+# recall    0.6250000 0.4100000
+# F1_score  0.6136527 0.3994019
+
+# multinomial logistic regression
+
+model <- nnet::multinom(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, data = train_data)
+summary(model)
+pscl::pR2(model)["McFadden"]
+# R^2 = 0.4133652
+
+#we reduce the model based on approximate confidence intervals, applying backward selection we remove rms_energy, mf_contrast, hf_contast
+model_red <- nnet::multinom(genre~ zcr+mean_chroma+spec_flat+lf_contrast, data = train_data)
+summary(model_red)
+pscl::pR2(model_red)["McFadden"]
+# R^2 = 0.3640281  
+
+#metrics
+pred_train <- factor(predict(object = model_red,type="class"))
+f= factor(train_data$genre)
+table(true.lable=f, class.assigned=pred_train)
+
+t_train <- table(true.label = f , assigned.label =pred_train )
+
+pred_test <- factor(predict(object = model_red, newdata= test_data, type="class"))
+f= factor(test_data$genre)
+table(true.lable=f, class.assigned=pred_test)
+
+t_test <- table(true.label = f , assigned.label =pred_test )
+
+MR_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
+MR_metrics
+
+#            training      test
+# accuracy  0.6025000 0.4400000
+# precision 0.5853185 0.4948485
+# recall    0.6025000 0.4400000
+# F1_score  0.5893005 0.4403928

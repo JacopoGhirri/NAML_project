@@ -17,6 +17,8 @@ library(arm)
 library(ResourceSelection)
 library(pROC)
 
+source("C:/Users/user/Desktop/università/dare/Numerical Analysis for Machine Learning/NAML proj/NAML_repo/NAML_project/White_box/metric_extractor.R")
+
 library(tidyverse)
 library(caret)
 library(nnet)
@@ -44,6 +46,8 @@ mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 #####
 
 #data generation
+
+n_classes <- 3
 
 country_data<- read_csv("country.csv")
 country_data$genre<-"country"
@@ -91,67 +95,49 @@ Qda.m <- predict(object=q, method = "plug-in")
 f= factor(train_data$genre)
 table(true.lable=f, class.assigned=Qda.m$class)
 
-l <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Qda.m$class )
-train_APER_qda <- 0
-for(i in 1:l){
-  train_APER_qda <- train_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-train_APER_qda
+t_train <- table(true.label = f , assigned.label =Qda.m$class )
 
-#aper_test data
 Qda.m <- predict(object = q, newdata = data.frame(test_data[,1:7]), method = "plug-in")
 f= factor(test_data$genre)
 table(true.lable=f, class.assigned=Qda.m$class)
 
-l <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Qda.m$class )
-test_APER_qda <- 0
-for(i in 1:l){
-  test_APER_qda <- test_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-test_APER_qda
+t_test <- table(true.label = f , assigned.label =Qda.m$class )
 
-qda_accuracies = cbind(training = 1-train_APER_qda,test = 1-test_APER_qda)
-qda_accuracies
-# training  test
-# 0.8       0.8333333
+qda_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
+qda_metrics
+
+#            training      test
+# accuracy  0.8000000 0.8333333
+# precision 0.8001758 0.8368687
+# recall    0.8000000 0.8333333
+# F1_score  0.7992042 0.8337928
 
 
 #LDA (dati NON gaussiani, same covariance)
 l<-lda(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast,prior=p, data = train_data)
 l #means
 
-#aper_train data
+#metrics
 Lda.m <- predict(l, method = "plug-in")
 f= factor(train_data$genre)
 table(true.lable=f, class.assigned=Lda.m$class)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Lda.m$class )
-train_APER_lda <- 0
-for(i in 1:len){
-  train_APER_lda <- train_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-train_APER_lda
+t_train <- table(true.label = f , assigned.label =Lda.m$class )
 
-#aper_test data
 Lda.m <- predict(object = l,newdata = test_data, method = "plug-in")
 f= factor(test_data$genre)
 table(true.lable=f, class.assigned=Lda.m$class)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Lda.m$class )
-test_APER_lda <- 0
-for(i in 1:len){
-  test_APER_lda <- test_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-test_APER_lda
+t_test <- table(true.label = f , assigned.label =Lda.m$class )
 
-lda_accuracies = cbind(training = 1-train_APER_lda,test = 1-test_APER_lda)
-lda_accuracies
-# training  test
-# 0.7708333 0.7333333
+lda_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
+lda_metrics
+
+#            training      test
+# accuracy  0.7708333 0.7333333
+# precision 0.7709681 0.8055556
+# recall    0.7708333 0.7333333
+# F1_score  0.7708800 0.7377137
 
 # multinomial logistic regression
 
@@ -174,29 +160,27 @@ pscl::pR2(model_red2)["McFadden"]
 
 # first reduced model
 #####
-#accuracy on training data:
+#metrics
 pred_train <- factor(genres[argmax(fitted(object = model_red))])
 f= factor(train_data$genre)
 table(true.lable=f, class.assigned=pred_train)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =pred_train )
-train_acc_logit <- mean(f == pred_train)
-train_acc_logit
-#accuracy on test data:
+t_train <- table(true.label = f , assigned.label =pred_train )
+
 pred_test <- factor(predict(object = model_red, newdata= test_data, type="class"))
 f= factor(test_data$genre)
 table(true.lable=f, class.assigned=pred_test)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =pred_test )
-test_acc_logit <- mean(f == pred_test)
-test_acc_logit
+t_test <- table(true.label = f , assigned.label =pred_test )
 
-logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_acc_logit)
-logistic_regression_accuracies
-# training  test
-# 0.7541667 0.7166667
+MR_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
+MR_metrics
+
+#            training      test
+# accuracy  0.7541667 0.7166667
+# precision 0.7530231 0.7376984
+# recall    0.7541667 0.7166667
+# F1_score  0.7526260 0.7193644
 #####
 
 # second reduced model
@@ -206,22 +190,20 @@ pred_train <- factor(genres[argmax(fitted(object = model_red2))])
 f= factor(train_data$genre)
 table(true.lable=f, class.assigned=pred_train)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =pred_train )
-train_acc_logit <- mean(f == pred_train)
-train_acc_logit
-#accuracy on test data:
+t_train <- table(true.label = f , assigned.label =pred_train )
+
 pred_test <- factor(predict(object = model_red2, newdata= test_data, type="class"))
 f= factor(test_data$genre)
 table(true.lable=f, class.assigned=pred_test)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =pred_test )
-test_acc_logit <- mean(f == pred_test)
-test_acc_logit
+t_test <- table(true.label = f , assigned.label =pred_test )
 
-logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_acc_logit)
-logistic_regression_accuracies
-# training  test
-# 0.7375    0.75
+MR_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
+MR_metrics
+
+#            training      test
+# accuracy  0.7375000 0.7500000
+# precision 0.7392523 0.7500430
+# recall    0.7375000 0.7500000
+# F1_score  0.7379968 0.7463722
 #####

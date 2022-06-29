@@ -25,6 +25,7 @@ library(caret)
 library(nnet)
 library(ramify)
 
+
 mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 {
   library(mvnormtest)
@@ -48,46 +49,60 @@ mcshapiro.test <- function(X, devstmax = 0.01, sim = ceiling(1/(4*devstmax^2)))
 
 #data generation
 
-n_classes <- 3
+n_classes <- 10
+
+blues_data<- read_csv("blues.csv")
+blues_data$genre<-"blues"
+
+classical_data<- read_csv("classical.csv")
+classical_data$genre<-"classical"
 
 jazz_data<- read_csv("jazz.csv")
 jazz_data$genre<-"jazz"
-jazz_data$genre <- as.factor(jazz_data$genre)
 
-blues_data<-read_csv("blues.csv")
-blues_data$genre<-"blues"
-blues_data$genre <- as.factor(blues_data$genre)
+country_data<- read_csv("country.csv")
+country_data$genre<-"country"
 
 reggae_data<-read_csv("reggae.csv")
 reggae_data$genre<-"reggae"
-reggae_data$genre <- as.factor(reggae_data$genre)
 
-train_data<-rbind(jazz_data[0:80,],blues_data[0:80,],reggae_data[0:80,])
-test_data<-rbind(jazz_data[81:100,],blues_data[81:100,],reggae_data[81:100,])
+hiphop_data<-read_csv("hiphop.csv")
+hiphop_data$genre<-"hiphop"
 
-genres <- c("jazz", "blues", "reggae")
+disco_data<- read_csv("disco.csv")
+disco_data$genre<-"disco"
+
+metal_data<- read_csv("metal.csv")
+metal_data$genre<-"metal"
+
+pop_data<- read_csv("pop.csv")
+pop_data$genre<-"pop"
+
+rock_data<- read_csv("rock.csv")
+rock_data$genre<-"rock"
+
+train_data<-rbind(blues_data[0:80,],classical_data[0:80,],country_data[0:80,],disco_data[0:80,],hiphop_data[0:80,],jazz_data[0:80,],metal_data[0:80,],pop_data[0:80,],reggae_data[0:80,],rock_data[0:80,])
+test_data<-rbind(blues_data[81:100,],classical_data[81:100,],country_data[81:100,],disco_data[81:100,],hiphop_data[81:100,],jazz_data[81:100,],metal_data[81:100,],pop_data[81:100,],reggae_data[81:100,],rock_data[81:100,])
+
 
 #priors 
-p<-rep(1/3,3)
+p<-rep(1/10,10)
 
-#assumptions
 
 #gauss
-mcshapiro.test(train_data[which(train_data$genre=="blues"),1:7])
-mcshapiro.test(train_data[which(train_data$genre=="jazz"),1:7])
-mcshapiro.test(train_data[which(train_data$genre=="reggae"),1:7])
-
+genres <- levels(as.factor(train_data$genre))
+for(i in 1:10){
+  print(mcshapiro.test(train_data[which(train_data$genre==genres[i]),1:7])$pvalue)
+}
+  
 #definetly not gaussian
 
 #covariance 
-v1<-var(train_data[which(train_data$genre=="blues"),1:7])
-v2<-var(train_data[which(train_data$genre=="jazz"),1:7])
-v3<-var(train_data[which(train_data$genre=="reggae"),1:7])
-v1
-v2
-v3
+for(i in 1:10){
+  print(var(train_data[which(train_data$genre==genres[i]),1:7]))
+}
 
-#not homoscedasticity
+# not homoscedastic
 
 
 #QDA (dati gaussiani, no same covariance)
@@ -111,10 +126,10 @@ qda_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
 qda_metrics
 
 #            training      test
-# accuracy  0.7833333 0.6833333
-# precision 0.8219260 0.6664863
-# recall    0.7833333 0.6833333
-# F1_score  0.7818805 0.6669638
+# accuracy  0.5475000 0.3700000
+# precision 0.5782914 0.3168942
+# recall    0.5475000 0.3700000
+# F1_score  0.5193343       NaN
 
 
 #LDA (dati NON gaussiani, same covariance)
@@ -138,39 +153,30 @@ lda_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
 lda_metrics
 
 #            training      test
-# accuracy  0.7458333 0.7500000
-# precision 0.7496077 0.7884615
-# recall    0.7458333 0.7500000
-# F1_score  0.7460626 0.7563939
+# accuracy  0.5200000 0.3350000
+# precision 0.5109265 0.2886057
+# recall    0.5200000 0.3350000
+# F1_score  0.5060305       NaN
 
 # multinomial logistic regression
 
 model <- nnet::multinom(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, data = train_data)
 summary(model)
 pscl::pR2(model)["McFadden"]
-# R^2 = 0.5369562
+# R^2 = 0.4357057 
 
-#we reduce the model based on approximate confidence intervals, applying backward selection we remove zrc
-model_red <- nnet::multinom(genre~ rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, data = train_data)
+#we reduce the model based on approximate confidence intervals, applying backward selection we remove lf_contrast, mf_contrast
+model_red <- nnet::multinom(genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast, data = train_data)
 summary(model_red)
 pscl::pR2(model_red)["McFadden"]
-# R^2 = 0.5265427
-#unsure, but rms_energy could be reduced
-model_red2 <- nnet::multinom(genre~ mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, data = train_data)
-summary(model_red2)
-pscl::pR2(model_red2)["McFadden"]
-# R^2 = 0.4831856
+# R^2 = 0.4053151   
 
-
-# first reduced model
-#####
-#metrics:
-pred_train <- factor(genres[argmax(fitted(object = model_red))])
+#metrics
+pred_train <- factor(predict(object = model_red,type="class"))
 f= factor(train_data$genre)
 table(true.lable=f, class.assigned=pred_train)
 
 t_train <- table(true.label = f , assigned.label =pred_train )
-t_train[,c(1,2)] <- t_train[,c(2,1)] #reordering
 
 pred_test <- factor(predict(object = model_red, newdata= test_data, type="class"))
 f= factor(test_data$genre)
@@ -181,35 +187,8 @@ t_test <- table(true.label = f , assigned.label =pred_test )
 MR_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
 MR_metrics
 
-#            training      test
-# accuracy  0.7416667 0.7000000
-# precision 0.7426017 0.7368814
-# recall    0.7416667 0.7000000
-# F1_score  0.7420055 0.7051051
-#####
-
-# second reduced model
-#####
-#accuracy on training data:
-pred_train <- factor(genres[argmax(fitted(object = model_red2))])
-f= factor(train_data$genre)
-table(true.lable=f, class.assigned=pred_train)
-
-t_train <- table(true.label = f , assigned.label =pred_train )
-t_train[,c(1,2)] <- t_train[,c(2,1)] #reordering
-
-pred_test <- factor(predict(object = model_red2, newdata= test_data, type="class"))
-f= factor(test_data$genre)
-table(true.lable=f, class.assigned=pred_test)
-
-t_test <- table(true.label = f , assigned.label =pred_test )
-
-MR_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
-MR_metrics
-
-#            training      test
-# accuracy  0.7041667 0.7000000
-# precision 0.7145697 0.7244916
-# recall    0.7041667 0.7000000
-# F1_score  0.7069249 0.7024258
-#####
+#            training     test
+# accuracy  0.5087500 0.345000
+# precision 0.4969623 0.330741
+# recall    0.5087500 0.345000
+# F1_score  0.4988976      NaN
