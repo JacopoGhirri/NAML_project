@@ -17,6 +17,9 @@ library(arm)
 library(ResourceSelection)
 library(pROC)
 
+source("C:/Users/user/Desktop/università/dare/Numerical Analysis for Machine Learning/NAML proj/NAML_repo/NAML_project/White_box/metric_extractor.R")
+
+
 #####
 
 #data generation - JAZZ & CLASSICAL
@@ -86,72 +89,54 @@ p<-c(1/2,1/2)
 q<-qda(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast, prior=p, data = train_data)
 q #means
 
-#aper_train data
+#metrics
 Qda.m <- predict(object=q, method = "plug-in")
 f= factor(train_data$binary_genre)
 table(true.lable=f, class.assigned=Qda.m$class)
 
-l <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Qda.m$class )
-train_APER_qda <- 0
-for(i in 1:l){
-  train_APER_qda <- train_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-train_APER_qda
+t_train <- table(true.label = f , assigned.label =Qda.m$class )
 
-#aper_test data
 Qda.m <- predict(object = q, newdata = data.frame(test_data[,1:7]), method = "plug-in")
 f= factor(test_data$binary_genre)
 table(true.lable=f, class.assigned=Qda.m$class)
 
-l <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Qda.m$class )
-test_APER_qda <- 0
-for(i in 1:l){
-  test_APER_qda <- test_APER_qda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-test_APER_qda
+t_test <- table(true.label = f , assigned.label =Qda.m$class )
 
-qda_accuracies = cbind(training = 1-train_APER_qda,test = 1-test_APER_qda)
-qda_accuracies
-# training  test
-# 0.7416667 0.525
+qda_metrics <- get_metrics_train_test(t_train, t_test, 2)
+qda_metrics
+
+#            training      test
+# accuracy  0.7416667 0.5250000
+# precision 0.7419355 0.5571429
+# recall    0.7416667 0.5250000
+# F1_score  0.7415949 0.4472727
 
 
 #LDA (dati NON gaussiani, same covariance)
 l<-lda(binary_genre~ zcr+rms_energy+mean_chroma+spec_flat+hf_contrast+mf_contrast+lf_contrast,prior=p, data = train_data)
 l #means
 
-#aper_train data
+#metrics
 Lda.m <- predict(l, method = "plug-in")
 f= factor(train_data$binary_genre)
 table(true.lable=f, class.assigned=Lda.m$class)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Lda.m$class )
-train_APER_lda <- 0
-for(i in 1:len){
-  train_APER_lda <- train_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-train_APER_lda
+t_train <- table(true.label = f , assigned.label =Lda.m$class )
 
-#aper_test data
 Lda.m <- predict(object = l,newdata = test_data, method = "plug-in")
 f= factor(test_data$binary_genre)
 table(true.lable=f, class.assigned=Lda.m$class)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =Lda.m$class )
-test_APER_lda <- 0
-for(i in 1:len){
-  test_APER_lda <- test_APER_lda + sum(t[i,-i])*p[i]/sum(t[i,])
-}
-test_APER_lda
+t_test <- table(true.label = f , assigned.label =Lda.m$class )
 
-lda_accuracies = cbind(training = 1-train_APER_lda,test = 1-test_APER_lda)
-lda_accuracies
-# training  test
-# 0.6583333 0.625
+lda_metrics <- get_metrics_train_test(t_train, t_test, 2)
+lda_metrics
+
+#            training      test
+# accuracy  0.6583333 0.6250000
+# precision 0.6583773 0.7857143
+# recall    0.6583333 0.6250000
+# F1_score  0.6583096 0.5636364
 
 
 #logistic regression + covariate selection
@@ -177,44 +162,36 @@ train_data_clean = train_data_clean[-out,]
 
 summary(glm_model)
 pscl::pR2(glm_model)["McFadden"]
-# R^2 = 0.8202896 
+# R^2 = 0.6610625  
 
 which(train_data$mean_chroma %in% train_data_clean$mean_chroma)
 
 
-# we apply backward selection: in order we remove hf_contrast, mean_chroma
+# we apply backward selection: in order we remove mean_chroma, hf_contrast
 
 glm_model_red <-glm(binary_genre~ zcr+rms_energy+spec_flat+mf_contrast+lf_contrast ,family=binomial( link = logit ), data = train_data_clean)
 summary(glm_model_red)
 pscl::pR2(glm_model_red)["McFadden"]
-# R^2 = 0.7890323
+# R^2 = 0.6505187 
 
-#accuracy on training data:
+#metrics
 pred_train <- as.numeric(fitted(object = glm_model_red)>0.5)
 f= factor(train_data_clean$binary_genre)
 table(true.lable=f, class.assigned=pred_train)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =pred_train )
-train_acc_logit <- 0
-for(i in 1:len){
-  train_acc_logit <- train_acc_logit + sum(t[i,i]*p[i])/sum(t[i,])
-}
-train_acc_logit
-#accuracy on test data:
+t_train <- table(true.label = f , assigned.label =pred_train )
+
 pred_test <- as.numeric(predict(object = glm_model_red, newdata= test_data, type="response")>0.5)
 f= factor(test_data$binary_genre)
 table(true.lable=f, class.assigned=pred_test)
 
-len <-length(levels(as.factor(f))) 
-t <- table(true.label = f , assigned.label =pred_test )
-test_acc_logit <- 0
-for(i in 1:len){
-  test_acc_logit <- test_acc_logit + sum(t[i,i]*p[i])/sum(t[i,])
-}
-test_acc_logit
+t_test <- table(true.label = f , assigned.label =pred_test )
 
-logistic_regression_accuracies = cbind(training = train_acc_logit, test = test_acc_logit)
-logistic_regression_accuracies
-# training  test
-# 0.9214286 0.575
+LR_metrics <- get_metrics_train_test(t_train, t_test, 2)
+LR_metrics
+
+#            training      test
+# accuracy  0.8717949 0.6000000
+# precision 0.8726527 0.7777778
+# recall    0.8674968 0.6000000
+# F1_score  0.8694744 0.5238095
