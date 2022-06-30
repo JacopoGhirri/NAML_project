@@ -157,5 +157,11 @@ t_test <- table(true.label = f , assigned.label =pred_test )
 LR_metrics <- get_metrics_train_test(t_train, t_test, n_classes)
 LR_metrics
 
+#           training      test
+# accuracy     0.975 0.9500000
+# precision    0.975 0.9545455
+# recall       0.975 0.9500000
+# F1_score     0.975 0.9498747
+
 #diagnostic
 residualPlots(glm_model_red)
