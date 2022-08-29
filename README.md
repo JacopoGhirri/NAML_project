@@ -1,1 +1,1 @@
-# NAML_project
+# Numerical Analysis for Machine Learning project
